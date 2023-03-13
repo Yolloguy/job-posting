@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\JobRequest;
+use App\Http\Requests\Jobs\JobRequest;
 use App\Models\Job;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -10,73 +10,85 @@ use Illuminate\Support\Facades\Redirect;
 
 class JobController extends Controller
 {
-    public function index(Request $request)
-    {
-        // Retrieve all jobs from the database
-        $jobs = Job::all();
-
-        // Return the jobs view with the jobs
-        return view('jobs.index', compact('jobs'));
+    public function index(){
+        $jobs = Job::paginate(10);
+        return response()->json([
+            'jobs' => $jobs
+        ]);
     }
 
-    public function create()
-    {
-        // Return the create job view
-        return view('jobs.create');
+    public function show($id){
+        $job = Job::where('id', $id)->first();
+
+        if(!$job){
+            return response()->json([
+                'message' => 'job does not exist'
+            ], 403);
+        }
+        return response()->json([
+            'job' => $job
+        ]);
     }
 
-    public function store(JobRequest $request)
-    {
+    public function store(JobRequest $request){
         // Create a new job instance with the validated data from the request
         $job = new Job($request->validated());
 
         // Set the user_id of the job to the authenticated user's id
-        $job->user_id = Auth::user()->id;
+        $job->user_id = auth()->id();
 
         // Save the job to the database
         $job->save();
 
-        // Redirect to the job index page with a success message
-        return Redirect::route('jobs.index')->with('success', 'Job created successfully.');
+        return response()->json([
+            'job' => $job
+        ]);
+
     }
 
-    public function edit(Job $job)
+    public function update(JobRequest $request, $id)
     {
-        // Check if the authenticated user is authorized to edit the job
-        if (Auth::user()->id != $job->user_id) {
-            abort(403);
+        $job = Job::where('id', $id)->first();
+
+        if(!$job){
+            return response()->json([
+                'message' => 'job does not exist'
+            ], 403);
         }
-
-        // Return the edit job view with the job
-        return view('jobs.edit', compact('job'));
-    }
-
-    public function update(JobRequest $request, Job $job)
-    {
         // Check if the authenticated user is authorized to update the job
         if (Auth::user()->id != $job->user_id) {
-            abort(403);
+            return response()->json([
+                'message' => 'you cannot modify job'
+            ], 403);
         }
 
         // Update the job with the validated data from the request
         $job->update($request->validated());
 
-        // Redirect to the job index page with a success message
-        return Redirect::route('jobs.index')->with('success', 'Job updated successfully.');
+        return response()->json([
+            'message' => 'job updated',
+            'job' => $job
+        ]);
     }
 
-    public function destroy(Job $job)
+    public function destroy($id)
     {
         // Check if the authenticated user is authorized to delete the job
-        if (Auth::user()->id != $job->user_id) {
-            abort(403);
+        $job = Job::where('id', $id)->first();
+
+        if(!$job){
+            return response()->json([
+                'message' => 'job does not exist'
+            ], 403);
         }
 
         // Delete the job from the database
         $job->delete();
 
         // Redirect to the job index page with a success message
-        return Redirect::route('jobs.index')->with('success', 'Job deleted successfully.');
+        return response()->json([
+            'message' => 'job deleted',
+        ]);
     }
 
     public function search(Request $request)
@@ -87,14 +99,15 @@ class JobController extends Controller
         // Search for jobs that match the search term in the title or description
         $jobs = Job::where('title', 'LIKE', "%$searchTerm%")
             ->orWhere('description', 'LIKE', "%$searchTerm%")
-            ->get();
+            ->paginate(10);
 
         // Return the search results view with the jobs and search term
-        return view('jobs.search', compact('jobs', 'searchTerm'));
+        return response()->json([
+            'jobs' => $jobs
+        ]);
     }
 
-    public function filter(Request $request)
-    {
+    public function filter(Request $request){
         // Get the filters from the request
         $location = $request->input('location');
         $salaryMin = $request->input('salary_min');
@@ -110,9 +123,14 @@ class JobController extends Controller
             ->when($salaryMax, function ($query, $salaryMax) {
             return $query->where('salary', '<=', $salaryMax);
             })
-            ->get();
-               // Return the filtered jobs view with the jobs and filters
-    return view('jobs.filter', compact('jobs', 'location', 'salaryMin', 'salaryMax'));
-}
+            ->paginate(10);
+        // Return the filtered jobs view with the jobs and filters
+        return response()->json([
+            'jobs' => $jobs,
+            'location' => $location,
+            'salaryMin' => $salaryMin,
+            'salaryMax' => $salaryMax,
+        ]);
+    }
 
 }

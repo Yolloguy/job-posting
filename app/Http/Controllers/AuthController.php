@@ -2,75 +2,59 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Auth\CreateUser;
+use App\Http\Requests\Auth\LoginUser;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 
 class AuthController extends Controller
 {
-    //Register
-    public function register(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'name' => 'required',
-        'email' => 'required|email|unique:users',
-        'password' => 'required',
-    ]);
+    public function register(CreateUser $request){
 
-    if ($validator->fails()) {
-        return response()->json(['error'=>$validator->errors()], 401);
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+        ]);
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user
+        ]);
     }
 
-    $user = User::create([
-        'name' => $request->name,
-        'email' => $request->email,
-        'password' => Hash::make($request->password),
-    ]);
-
-    $token = $user->createToken('auth_token')->plainTextToken;
-
-    return response()->json([
-        'access_token' => $token,
-        'token_type' => 'Bearer',
-        'user' => $user
-    ]);
-}
-
-//Login
-
-public function login(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'email' => 'required|email',
-        'password' => 'required',
-    ]);
-
-    if ($validator->fails()) {
-        return response()->json(['error'=>$validator->errors()], 401);
+    public function user() : mixed{
+        $user = auth()->user();
+        return response()->json([
+            'user' => $user
+        ]);
     }
 
-    $user = User::where('email', $request->email)->first();
-
-    if (!$user || !Hash::check($request->password, $user->password)) {
-        return response()->json(['error'=>'Unauthorized'], 401);
+    public function login(LoginUser $request)
+    {
+        if(auth()->attempt(['email' => $request->email, 'password' => $request->password])){
+            $user = auth()->user();
+            $token =  $user->createToken($user->email)->plainTextToken;
+            return response()->json([
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+                'user' => $user
+            ]);
+        }
+        else{
+            return response()->json([
+                'message' => 'Login Failed',
+            ], 401);
+        }
     }
 
-    $token = $user->createToken('auth_token')->plainTextToken;
-
-    return response()->json([
-        'access_token' => $token,
-        'token_type' => 'Bearer',
-        'user' => $user
-    ]);
-}
-
-// Logout
-
-public function logout(Request $request)
-{
-    $request->user()->tokens()->delete();
-
-    return response()->json(['message' => 'Logged out']);
-}
+    public function logout(Request $request){
+        $request->user()->tokens()->delete();
+        return response()->json(['message' => 'Logged out']);
+    }
 }

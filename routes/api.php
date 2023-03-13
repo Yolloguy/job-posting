@@ -1,9 +1,10 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\JobController;
+use App\Http\Controllers\{
+    AuthController,
+    JobController
+};
 
 /*
 |--------------------------------------------------------------------------
@@ -16,22 +17,40 @@ use App\Http\Controllers\JobController;
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+Route::group(['prefix' => 'v1'], function() {
+
+    Route::group(['prefix' => 'auth'], function() {
+        Route::post('/register', [AuthController::class, 'register']);
+        Route::post('/login', [AuthController::class, 'login']);
+    });
+
+    Route::group(['middleware' => ['auth:sanctum']],function() {
+
+        Route::group(['prefix' => 'auth'], function() {
+            Route::get('/user', [AuthController::class, 'user']);
+            Route::post('/logout', [AuthController::class, 'logout']);
+        });
+
+        Route::group(['prefix' => 'jobs'], function() {
+            Route::post('/', [JobController::class, 'store']);
+            Route::put('/{id}', [JobController::class, 'update']);
+            Route::delete('/{id}', [JobController::class, 'destroy']);
+        });
+
+    });
+
+    Route::group(['prefix' => 'jobs'], function() {
+        Route::get('/', [JobController::class, 'index']);
+        Route::get('/{id}', [JobController::class, 'show']);
+    });
+
+    Route::group(['prefix' => 'search'], function() {
+        Route::get('/jobs', [JobController::class, 'search']);
+    });
+
+    Route::group(['prefix' => 'filter'], function() {
+        Route::get('/jobs', [JobController::class, 'filter']);
+    });
+
 });
 
-
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('jobs', 'App\Http\Controllers\JobController@store');
-    Route::put('jobs/{id}', 'App\Http\Controllers\JobController@update');
-    Route::delete('jobs/{id}', 'App\Http\Controllers\JobController@destroy');
-});
-
-Route::get('jobs', 'App\Http\Controllers\JobController@index');
-Route::get('jobs/{id}', 'App\Http\Controllers\JobController@show');
-Route::get('jobs/search', 'App\Http\Controllers\JobController@search');
-Route::middleware('auth:sanctum')->get('jobs/filter', 'App\Http\Controllers\JobController@filter');
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('login', [AuthController::class, 'login']);
-// Route::post('/jobs', [JobController::class, 'store'])->name('jobs.store');
